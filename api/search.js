@@ -6,18 +6,12 @@ export default async function handler(req, res) {
   const OC = process.env.LAW_API_KEY;
 
   try {
-    // 올바른 URL (http → https, DRF 경로)
     const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=law&type=JSON&display=20&query=${encodeURIComponent(query)}`;
-    
     const upstream = await fetch(url);
     const text = await upstream.text();
-    
-    if (!text || text.trim().startsWith('<')) {
-      return res.status(200).json({ LawSearch: { law: [] }, debug: text.slice(0, 300) });
-    }
 
-    const data = JSON.parse(text);
-    res.status(200).json(data);
+    // 응답 원문 그대로 반환
+    res.status(200).json({ __raw: text.slice(0, 2000) });
 
   } catch (e) {
     res.status(500).json({ error: e.message });

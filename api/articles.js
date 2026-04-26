@@ -4,109 +4,48 @@ export default async function handler(req, res) {
 
   const { mst, keyword } = req.query;
   const OC = process.env.LAW_API_KEY;
+  const kw = (keyword || '').trim();
 
   try {
-    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=law&type=JSON&MST=${mst}`;
+    // XML로 받아서 정규식으로 파싱 (JSON보다 가벼움)
+    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=law&type=XML&MST=${mst}`;
     const upstream = await fetch(url);
-    const text = await upstream.text();
+    const xml = await upstream.text();
 
-    let data;
-    try { data = JSON.parse(text); } catch {
+    if (!xml || xml.includes('일치하는 법령이 없습니다')) {
       return res.status(200).json({ articles: [] });
     }
 
-    // 응답 구조: data.법령.조문.조문단위
-    const rawArticles =
-      data?.법령?.조문?.조문단위 ||
-      data?.LawService?.법령?.조문?.조문단위 ||
-      data?.법령?.조문단위 || [];
+    // XML에서 조문단위 추출
+    const articleBlocks = xml.match(/<조문단위[^>]*>([\s\S]*?)<\/조문단위>/g) || [];
 
-    const articles = [].concat(rawArticles);
-    const kw = keyword || '';
+    const results = [];
+    for (const block of articleBlocks) {
+      // 키워드 필터
+      if (kw && !block.includes(kw)) continue;
 
-    // 키워드 필터 (없으면 전체)
-    const filtered = kw
-      ? articles.filter(a => JSON.stringify(a).includes(kw))
-      : articles;
+      const num   = (block.match(/<조문번호>([^<]*)</) || [])[1] || '';
+      const title = (block.match(/<조문제목>([^<]*)</) || [])[1] || '';
+      const content = (block.match(/<조문내용><!\[CDATA\[([\s\S]*?)\]\]>/) ||
+                       block.match(/<조문내용>([^<]*)</)  || [])[1] || '';
 
-    // 결과 없으면 앞 20개라도 반환
-    export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+      // 항 내용
+      const items = [];
+      const hangMatches = block.match(/<항내용><!\[CDATA\[([\s\S]*?)\]\]>/g) || [];
+      for (const h of hangMatches) {
+        const txt = (h.match(/<항내용><!\[CDATA\[([\s\S]*?)\]\]>/) || [])[1];
+        if (txt) items.push(txt.trim());
+      }
 
-  const { mst, keyword } = req.query;
-  const OC = process.env.LAW_API_KEY;
+      if (num || content) {
+        results.push({ num, title, content: content.trim(), items });
+      }
 
-  try {
-    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=law&type=JSON&MST=${mst}`;
-    const upstream = await fetch(url);
-    const text = await upstream.text();
-
-    let data;
-    try { data = JSON.parse(text); } catch {
-      return res.status(200).json({ articles: [] });
+      if (results.length >= 30) break;
     }
 
-    const rawArticles =
-      data?.법령?.조문?.조문단위 ||
-      data?.LawService?.법령?.조문?.조문단위 ||
-      data?.법령?.조문단위 || [];
-
-    const articles = [].concat(rawArticles);
-    const kw = (keyword || '').trim();
-
-    // 키워드가 있으면 반드시 필터링
-    const result = (kw
-      ? articles.filter(a => JSON.stringify(a).includes(kw))
-      : articles
-    ).slice(0, 50).map(a => ({
-      num:     a.조문번호  || '',
-      title:   a.조문제목  || '',
-      content: a.조문내용  || '',
-      items:   extractItems(a),
-    }));
-
-    res.status(200).json({ 
-      articles: result,
-      total: result.length,
-      matched: kw ? true : false
-    });
+    res.status(200).json({ articles: results });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-}
-
-function extractItems(a) {
-  const parts = [];
-  for (const h of [].concat(a.항 || [])) {
-    if (h.항내용) parts.push(h.항내용);
-    for (const ho of [].concat(h.호 || [])) {
-      if (ho.호내용) parts.push('  · ' + ho.호내용);
-    }
-  }
-  return parts;
-}
-
-    const result = source.slice(0, 50).map(a => ({
-      num:     a.조문번호  || '',
-      title:   a.조문제목  || '',
-      content: a.조문내용  || '',
-      items:   extractItems(a),
-    }));
-
-    res.status(200).json({ articles: result });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-}
-
-function extractItems(a) {
-  const parts = [];
-  for (const h of [].concat(a.항 || [])) {
-    if (h.항내용) parts.push(h.항내용);
-    for (const ho of [].concat(h.호 || [])) {
-      if (ho.호내용) parts.push('  · ' + ho.호내용);
-    }
-  }
-  return parts;
 }

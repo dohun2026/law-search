@@ -147,7 +147,7 @@ async function loadArticles(idx){
   const law=lawData[idx];
   const articlesDiv=document.getElementById(`articles-${idx}`);
   try{
-    const res=await fetch(`${BASE}/api/articles?mst=${law.msn}&keyword=${encodeURIComponent(currentKeyword)}`);
+    const res = await fetch(`${BASE}/api/articles?mst=${law.msn}&name=${encodeURIComponent(law.name)}&keyword=${encodeURIComponent(currentKeyword)}`);
     if(!res.ok)throw new Error(`서버 오류 ${res.status}`);
     const data=await res.json();
     if(data.error)throw new Error(data.error);

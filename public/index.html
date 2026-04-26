@@ -6,7 +6,7 @@
 <title>건축법령 검색</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--accent:#e6a817;--accent2:#f0c040;--text:#e6edf3;--text-muted:#8b949e;--text-dim:#484f58;--success:#3fb950;--tag-bg:#1f2d3d;--tag-border:#264669; }
+  :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--accent:#e6a817;--accent2:#f0c040;--text:#e6edf3;--text-muted:#8b949e;--text-dim:#484f58;--success:#3fb950;--tag-bg:#1f2d3d;--tag-border:#264669;}
   *{margin:0;padding:0;box-sizing:border-box;}
   body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100vh;}
   header{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;}
@@ -102,94 +102,67 @@
   </div>
 </main>
 <script>
-const OC = 'dohun2026';
+// Vercel 프록시 방식 (서버에서 법제처 호출)
+const BASE = '';
 let currentKeyword = '';
 let openCardIdx = null;
 let lawData = [];
 
-function quickSearch(kw) {
-  document.getElementById('searchInput').value = kw;
-  doSearch();
-}
+function quickSearch(kw){document.getElementById('searchInput').value=kw;doSearch();}
 
-async function doSearch() {
-  const kw = document.getElementById('searchInput').value.trim();
-  if (!kw) return;
-  currentKeyword = kw;
-  openCardIdx = null;
-  const btn = document.getElementById('searchBtn');
-  btn.disabled = true; btn.textContent = '검색 중…';
+async function doSearch(){
+  const kw=document.getElementById('searchInput').value.trim();
+  if(!kw)return;
+  currentKeyword=kw;openCardIdx=null;
+  const btn=document.getElementById('searchBtn');
+  btn.disabled=true;btn.textContent='검색 중…';
   showLoading();
-  try {
-    const data = await jsonp(`https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=law&type=JSON&display=20&query=${encodeURIComponent(kw)}`);
-    const laws = [].concat(data?.LawSearch?.law || []);
-    lawData = laws.map(l => ({
-      id: l.법령ID||'', name: l.법령명한글||l.법령명||'(법령명 없음)',
-      type: classifyType(l.법령구분명||''), date: l.공포일자||'', msn: l.법령일련번호||''
+  try{
+    const res=await fetch(`${BASE}/api/search?query=${encodeURIComponent(kw)}`);
+    if(!res.ok)throw new Error(`서버 오류 ${res.status}`);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    const laws=[].concat(data?.LawSearch?.law||[]);
+    lawData=laws.map(l=>({
+      id:l.법령ID||'',name:l.법령명한글||l.법령명||'(법령명 없음)',
+      type:classifyType(l.법령구분명||''),date:l.공포일자||'',msn:l.법령일련번호||''
     }));
-    renderResults(lawData, kw);
-  } catch(e) {
-    showError(`검색 실패: ${e.message}`);
-  } finally {
-    btn.disabled = false; btn.textContent = '검색';
-  }
+    renderResults(lawData,kw);
+  }catch(e){showError(`검색 실패: ${e.message}`);}
+  finally{btn.disabled=false;btn.textContent='검색';}
 }
 
-async function togglePanel(idx) {
-  const panel = document.getElementById(`panel-${idx}`);
-  const card = document.getElementById(`card-${idx}`);
-  if (panel.classList.contains('open')) {
-    panel.classList.remove('open'); card.classList.remove('active'); openCardIdx = null; return;
-  }
-  if (openCardIdx !== null) {
-    document.getElementById(`panel-${openCardIdx}`)?.classList.remove('open');
-    document.getElementById(`card-${openCardIdx}`)?.classList.remove('active');
-  }
-  panel.classList.add('open'); card.classList.add('active'); openCardIdx = idx;
+async function togglePanel(idx){
+  const panel=document.getElementById(`panel-${idx}`);
+  const card=document.getElementById(`card-${idx}`);
+  if(panel.classList.contains('open')){panel.classList.remove('open');card.classList.remove('active');openCardIdx=null;return;}
+  if(openCardIdx!==null){document.getElementById(`panel-${openCardIdx}`)?.classList.remove('open');document.getElementById(`card-${openCardIdx}`)?.classList.remove('active');}
+  panel.classList.add('open');card.classList.add('active');openCardIdx=idx;
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
-  const articlesDiv = document.getElementById(`articles-${idx}`);
-  if (!articlesDiv.dataset.loaded) { articlesDiv.dataset.loaded='1'; await loadArticles(idx); }
+  const articlesDiv=document.getElementById(`articles-${idx}`);
+  if(!articlesDiv.dataset.loaded){articlesDiv.dataset.loaded='1';await loadArticles(idx);}
 }
 
-async function loadArticles(idx) {
-  const law = lawData[idx];
-  const articlesDiv = document.getElementById(`articles-${idx}`);
-  try {
-    const data = await jsonp(`https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=law&type=JSON&MST=${law.msn}`);
-    const rawArticles = data?.법령?.조문?.조문단위 || [];
-    const articles = [].concat(rawArticles);
-    const kw = currentKeyword;
-    const filtered = kw ? articles.filter(a => JSON.stringify(a).includes(kw)) : articles;
-    const result = filtered.slice(0,30).map(a => ({
-      num: a.조문번호||'', title: a.조문제목||'', content: a.조문내용||'', items: extractItems(a)
-    }));
-    renderArticles(articlesDiv, result, kw);
-  } catch(e) {
-    articlesDiv.innerHTML = `<div class="no-article">조문 로드 실패: ${e.message}</div>`;
-  }
+async function loadArticles(idx){
+  const law=lawData[idx];
+  const articlesDiv=document.getElementById(`articles-${idx}`);
+  try{
+    const res=await fetch(`${BASE}/api/articles?mst=${law.msn}&keyword=${encodeURIComponent(currentKeyword)}`);
+    if(!res.ok)throw new Error(`서버 오류 ${res.status}`);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    renderArticles(articlesDiv,data.articles||[],currentKeyword);
+  }catch(e){articlesDiv.innerHTML=`<div class="no-article">조문 로드 실패: ${e.message}</div>`;}
 }
 
-function jsonp(url, timeout=10000) {
-  return new Promise((resolve, reject) => {
-    const cb = 'lawCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const script = document.createElement('script');
-    const timer = setTimeout(() => { cleanup(); reject(new Error('요청 시간 초과')); }, timeout);
-    window[cb] = (data) => { cleanup(); resolve(data); };
-    script.onerror = () => { cleanup(); reject(new Error('법제처 서버 연결 실패')); };
-    script.src = url + `&callback=${cb}`;
-    document.head.appendChild(script);
-    function cleanup() { clearTimeout(timer); delete window[cb]; if(script.parentNode) script.parentNode.removeChild(script); }
-  });
-}
-
-function renderResults(results, kw) {
-  const area = document.getElementById('resultArea');
-  if (!results.length) { area.innerHTML=`<div class="error-msg">「${kw}」 관련 법령이 없습니다.</div>`; return; }
-  let html = `<div class="result-header"><div class="result-count"><span class="result-keyword">「${kw}」</span> 관련 법령 <strong style="color:var(--text)">${results.length}건</strong></div></div><div class="law-list">`;
-  results.forEach((law, i) => {
-    const typeLabel = {law:'법률',decree:'시행령',rule:'시행규칙',notice:'고시·예규'}[law.type]||'법령';
-    const highlighted = esc(law.name).replace(new RegExp(escRe(kw),'g'),`<em>${kw}</em>`);
-    html += `<div>
+function renderResults(results,kw){
+  const area=document.getElementById('resultArea');
+  if(!results.length){area.innerHTML=`<div class="error-msg">「${kw}」 관련 법령이 없습니다.</div>`;return;}
+  let html=`<div class="result-header"><div class="result-count"><span class="result-keyword">「${kw}」</span> 관련 법령 <strong style="color:var(--text)">${results.length}건</strong></div></div><div class="law-list">`;
+  results.forEach((law,i)=>{
+    const typeLabel={law:'법률',decree:'시행령',rule:'시행규칙',notice:'고시·예규'}[law.type]||'법령';
+    const highlighted=esc(law.name).replace(new RegExp(escRe(kw),'g'),`<em>${kw}</em>`);
+    html+=`<div>
       <div class="law-card" id="card-${i}" onclick="togglePanel(${i})">
         <span class="law-type-badge badge-${law.type}">${typeLabel}</span>
         <span class="law-name">${highlighted}</span>
@@ -205,16 +178,16 @@ function renderResults(results, kw) {
       </div>
     </div>`;
   });
-  html += '</div>';
-  area.innerHTML = html;
+  html+='</div>';
+  area.innerHTML=html;
 }
 
-function renderArticles(container, articles, kw) {
-  if (!articles.length) { container.innerHTML=`<div class="no-article">「${kw}」 포함 조문을 찾지 못했습니다.</div>`; return; }
-  const re = new RegExp(escRe(kw),'g');
-  const mark = t => esc(t).replace(re,`<em>${kw}</em>`);
-  container.innerHTML = articles.map(a => {
-    const sub = (a.items||[]).map(s=>`<div>${mark(s)}</div>`).join('');
+function renderArticles(container,articles,kw){
+  if(!articles.length){container.innerHTML=`<div class="no-article">「${kw}」 포함 조문을 찾지 못했습니다.</div>`;return;}
+  const re=new RegExp(escRe(kw),'g');
+  const mark=t=>esc(t).replace(re,`<em>${kw}</em>`);
+  container.innerHTML=articles.map(a=>{
+    const sub=(a.items||[]).map(s=>`<div>${mark(s)}</div>`).join('');
     return `<div class="article-item">
       <div class="article-num">제${a.num}조${a.title?' ('+esc(a.title)+')':''}</div>
       ${a.content?`<div class="article-body">${mark(a.content)}</div>`:''}
@@ -223,26 +196,13 @@ function renderArticles(container, articles, kw) {
   }).join('');
 }
 
-function extractItems(a) {
-  const parts=[];
-  for (const h of [].concat(a.항||[])) {
-    if(h.항내용) parts.push(h.항내용);
-    for (const ho of [].concat(h.호||[])) { if(ho.호내용) parts.push('  · '+ho.호내용); }
-  }
-  return parts;
-}
-
-function classifyType(t) {
-  if(t.includes('법률')) return 'law';
-  if(t.includes('대통령령')||t.includes('시행령')) return 'decree';
-  if(t.includes('시행규칙')||t.includes('부령')) return 'rule';
-  return 'notice';
-}
-function fmtDate(d) { if(!d||d.length<8) return ''; return `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`; }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
-function showLoading() { document.getElementById('resultArea').innerHTML=`<div class="loading"><div class="spinner"></div><br><span style="font-size:13px">검색 중…</span></div>`; }
-function showError(msg) { document.getElementById('resultArea').innerHTML=`<div class="error-msg">${msg}</div>`; }
+function extractItems(a){const parts=[];for(const h of[].concat(a.항||[])){if(h.항내용)parts.push(h.항내용);for(const ho of[].concat(h.호||[])){if(ho.호내용)parts.push('  · '+ho.호내용);}}return parts;}
+function classifyType(t){if(t.includes('법률'))return'law';if(t.includes('대통령령')||t.includes('시행령'))return'decree';if(t.includes('시행규칙')||t.includes('부령'))return'rule';return'notice';}
+function fmtDate(d){if(!d||d.length<8)return'';return`${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function showLoading(){document.getElementById('resultArea').innerHTML=`<div class="loading"><div class="spinner"></div><br><span style="font-size:13px">검색 중…</span></div>`;}
+function showError(msg){document.getElementById('resultArea').innerHTML=`<div class="error-msg">${msg}</div>`;}
 </script>
 </body>
 </html>

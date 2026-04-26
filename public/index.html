@@ -32,6 +32,8 @@
   .law-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:12px;}
   .law-card:hover{border-color:var(--accent);background:var(--surface2);transform:translateX(3px);}
   .law-card.active{border-color:var(--accent);background:rgba(230,168,23,0.06);border-radius:10px 10px 0 0;}
+  .law-card.no-result{opacity:0.45;cursor:default;}
+  .law-card.no-result:hover{transform:none;border-color:var(--border);background:var(--surface);}
   .law-type-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap;flex-shrink:0;}
   .badge-law{background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid rgba(63,185,80,0.3);}
   .badge-decree{background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);}
@@ -40,6 +42,13 @@
   .law-name{flex:1;font-size:14px;font-weight:500;line-height:1.5;}
   .law-name em{color:var(--accent2);font-style:normal;font-weight:700;background:rgba(230,168,23,0.1);padding:0 2px;border-radius:2px;}
   .law-date{font-size:11px;color:var(--text-dim);white-space:nowrap;}
+
+  /* 조문 수 뱃지 */
+  .count-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;flex-shrink:0;}
+  .count-loading{background:rgba(255,255,255,0.05);color:var(--text-dim);border:1px solid var(--border);}
+  .count-hit{background:rgba(230,168,23,0.15);color:var(--accent2);border:1px solid rgba(230,168,23,0.4);}
+  .count-none{background:rgba(255,255,255,0.04);color:var(--text-dim);border:1px solid var(--border);}
+
   .law-arrow{color:var(--text-dim);font-size:16px;transition:transform 0.15s;}
   .law-card:hover .law-arrow,.law-card.active .law-arrow{transform:translateX(3px);color:var(--accent);}
   .article-panel{background:var(--surface2);border:1px solid var(--accent);border-top:none;border-radius:0 0 10px 10px;display:none;overflow:hidden;}
@@ -102,18 +111,20 @@
   </div>
 </main>
 <script>
-// Vercel 프록시 방식 (서버에서 법제처 호출)
 const BASE = '';
 let currentKeyword = '';
 let openCardIdx = null;
 let lawData = [];
+let countCache = {}; // MST -> 조문수 캐시
 
 function quickSearch(kw){document.getElementById('searchInput').value=kw;doSearch();}
 
 async function doSearch(){
   const kw=document.getElementById('searchInput').value.trim();
   if(!kw)return;
-  currentKeyword=kw;openCardIdx=null;
+  currentKeyword=kw;
+  openCardIdx=null;
+  countCache={};
   const btn=document.getElementById('searchBtn');
   btn.disabled=true;btn.textContent='검색 중…';
   showLoading();
@@ -128,15 +139,59 @@ async function doSearch(){
       type:classifyType(l.법령구분명||''),date:l.공포일자||'',msn:l.법령일련번호||''
     }));
     renderResults(lawData,kw);
+    // 백그라운드에서 조문 수 미리 조회
+    prefetchCounts(lawData, kw);
   }catch(e){showError(`검색 실패: ${e.message}`);}
   finally{btn.disabled=false;btn.textContent='검색';}
 }
 
+// 백그라운드에서 각 법령의 조문 수 미리 조회
+async function prefetchCounts(laws, kw) {
+  for (let i = 0; i < laws.length; i++) {
+    const law = laws[i];
+    if (!law.msn) continue;
+    try {
+      const res = await fetch(`${BASE}/api/articles?mst=${law.msn}&keyword=${encodeURIComponent(kw)}`);
+      const data = await res.json();
+      const count = (data.articles || []).length;
+      countCache[law.msn] = count;
+      // 카드 뱃지 업데이트
+      const badge = document.getElementById(`count-${i}`);
+      if (badge) {
+        if (count > 0) {
+          badge.textContent = `조문 ${count}건`;
+          badge.className = 'count-badge count-hit';
+          // 조문 있는 카드는 클릭 활성화
+          const card = document.getElementById(`card-${i}`);
+          if (card) card.classList.remove('no-result');
+        } else {
+          badge.textContent = '조문 없음';
+          badge.className = 'count-badge count-none';
+          const card = document.getElementById(`card-${i}`);
+          if (card) card.classList.add('no-result');
+        }
+      }
+    } catch { 
+      const badge = document.getElementById(`count-${i}`);
+      if (badge) { badge.textContent = '확인 필요'; badge.className = 'count-badge count-none'; }
+    }
+    // 서버 부하 방지: 0.3초 간격
+    await new Promise(r => setTimeout(r, 300));
+  }
+}
+
 async function togglePanel(idx){
-  const panel=document.getElementById(`panel-${idx}`);
   const card=document.getElementById(`card-${idx}`);
-  if(panel.classList.contains('open')){panel.classList.remove('open');card.classList.remove('active');openCardIdx=null;return;}
-  if(openCardIdx!==null){document.getElementById(`panel-${openCardIdx}`)?.classList.remove('open');document.getElementById(`card-${openCardIdx}`)?.classList.remove('active');}
+  if(card.classList.contains('no-result')) return; // 조문 없는 카드 클릭 무시
+
+  const panel=document.getElementById(`panel-${idx}`);
+  if(panel.classList.contains('open')){
+    panel.classList.remove('open');card.classList.remove('active');openCardIdx=null;return;
+  }
+  if(openCardIdx!==null){
+    document.getElementById(`panel-${openCardIdx}`)?.classList.remove('open');
+    document.getElementById(`card-${openCardIdx}`)?.classList.remove('active');
+  }
   panel.classList.add('open');card.classList.add('active');openCardIdx=idx;
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   const articlesDiv=document.getElementById(`articles-${idx}`);
@@ -147,7 +202,7 @@ async function loadArticles(idx){
   const law=lawData[idx];
   const articlesDiv=document.getElementById(`articles-${idx}`);
   try{
-    const res = await fetch(`${BASE}/api/articles?mst=${law.msn}&name=${encodeURIComponent(law.name)}&keyword=${encodeURIComponent(currentKeyword)}`);
+    const res=await fetch(`${BASE}/api/articles?mst=${law.msn}&keyword=${encodeURIComponent(currentKeyword)}`);
     if(!res.ok)throw new Error(`서버 오류 ${res.status}`);
     const data=await res.json();
     if(data.error)throw new Error(data.error);
@@ -158,7 +213,12 @@ async function loadArticles(idx){
 function renderResults(results,kw){
   const area=document.getElementById('resultArea');
   if(!results.length){area.innerHTML=`<div class="error-msg">「${kw}」 관련 법령이 없습니다.</div>`;return;}
-  let html=`<div class="result-header"><div class="result-count"><span class="result-keyword">「${kw}」</span> 관련 법령 <strong style="color:var(--text)">${results.length}건</strong></div></div><div class="law-list">`;
+  let html=`<div class="result-header"><div class="result-count">
+    <span class="result-keyword">「${kw}」</span> 관련 법령
+    <strong style="color:var(--text)">${results.length}건</strong>
+    <span style="font-size:11px;color:var(--text-dim);margin-left:6px">조문 수 확인 중…</span>
+  </div></div><div class="law-list">`;
+
   results.forEach((law,i)=>{
     const typeLabel={law:'법률',decree:'시행령',rule:'시행규칙',notice:'고시·예규'}[law.type]||'법령';
     const highlighted=esc(law.name).replace(new RegExp(escRe(kw),'g'),`<em>${kw}</em>`);
@@ -167,6 +227,7 @@ function renderResults(results,kw){
         <span class="law-type-badge badge-${law.type}">${typeLabel}</span>
         <span class="law-name">${highlighted}</span>
         <span class="law-date">${fmtDate(law.date)}</span>
+        <span class="count-badge count-loading" id="count-${i}">확인 중…</span>
         <span class="law-arrow">›</span>
       </div>
       <div class="article-panel" id="panel-${i}">
@@ -196,8 +257,12 @@ function renderArticles(container,articles,kw){
   }).join('');
 }
 
-function extractItems(a){const parts=[];for(const h of[].concat(a.항||[])){if(h.항내용)parts.push(h.항내용);for(const ho of[].concat(h.호||[])){if(ho.호내용)parts.push('  · '+ho.호내용);}}return parts;}
-function classifyType(t){if(t.includes('법률'))return'law';if(t.includes('대통령령')||t.includes('시행령'))return'decree';if(t.includes('시행규칙')||t.includes('부령'))return'rule';return'notice';}
+function classifyType(t){
+  if(t.includes('법률'))return'law';
+  if(t.includes('대통령령')||t.includes('시행령'))return'decree';
+  if(t.includes('시행규칙')||t.includes('부령'))return'rule';
+  return'notice';
+}
 function fmtDate(d){if(!d||d.length<8)return'';return`${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`;}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}

@@ -11,56 +11,19 @@ export default async function handler(req, res) {
     const text = await upstream.text();
 
     if (!text || text.trim().startsWith('<')) {
-      return res.status(200).json({ articles: [] });
+      return res.status(200).json({ articles: [], debug: 'xml_or_empty', raw: text.slice(0,200) });
     }
 
     const data = JSON.parse(text);
 
-    // 조문 구조 다양하게 시도
-    const rawArticles =
-      data?.법령?.조문?.조문단위 ||
-      data?.LawService?.법령?.조문?.조문단위 ||
-      data?.조문?.조문단위 || [];
+    // 응답 구조 전체를 디버그로 반환
+    return res.status(200).json({ 
+      articles: [], 
+      debug_keys: Object.keys(data),
+      debug_raw: JSON.stringify(data).slice(0, 500)
+    });
 
-    const articles = [].concat(rawArticles);
-
-    // 키워드 있으면 필터, 없으면 전체 (최대 50개)
-    const kw = keyword || '';
-    const filtered = kw
-      ? articles.filter(a => JSON.stringify(a).includes(kw))
-      : articles;
-
-    const result = filtered.slice(0, 50).map(a => ({
-      num:     a.조문번호  || '',
-      title:   a.조문제목  || '',
-      content: a.조문내용  || '',
-      items:   extractItems(a),
-    }));
-
-    // 필터 결과 없으면 전체 앞 10개라도 반환
-    if (result.length === 0 && articles.length > 0) {
-      const fallback = articles.slice(0, 10).map(a => ({
-        num:     a.조문번호  || '',
-        title:   a.조문제목  || '',
-        content: a.조문내용  || '',
-        items:   extractItems(a),
-      }));
-      return res.status(200).json({ articles: fallback, note: '키워드 조문 없음, 앞 10개 표시' });
-    }
-
-    res.status(200).json({ articles: result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
-}
-
-function extractItems(a) {
-  const parts = [];
-  for (const h of [].concat(a.항 || [])) {
-    if (h.항내용) parts.push(h.항내용);
-    for (const ho of [].concat(h.호 || [])) {
-      if (ho.호내용) parts.push('  · ' + ho.호내용);
-    }
-  }
-  return parts;
 }

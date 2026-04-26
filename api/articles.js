@@ -6,24 +6,52 @@ export default async function handler(req, res) {
   const OC = process.env.LAW_API_KEY;
 
   try {
-    // MST로 직접 조회 (lawName 파라미터 제거)
     const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=law&type=JSON&MST=${mst}`;
     const upstream = await fetch(url);
     const text = await upstream.text();
 
-    // 응답 전체를 디버그로 반환
     let data;
     try { data = JSON.parse(text); } catch {
-      return res.status(200).json({ articles: [], debug: 'parse_fail', raw: text.slice(0,300) });
+      return res.status(200).json({ articles: [] });
     }
 
-    return res.status(200).json({ 
-      articles: [],
-      debug_keys: Object.keys(data),
-      debug_sub: data ? JSON.stringify(data).slice(0, 800) : 'null'
-    });
+    // 응답 구조: data.법령.조문.조문단위
+    const rawArticles =
+      data?.법령?.조문?.조문단위 ||
+      data?.LawService?.법령?.조문?.조문단위 ||
+      data?.법령?.조문단위 || [];
 
+    const articles = [].concat(rawArticles);
+    const kw = keyword || '';
+
+    // 키워드 필터 (없으면 전체)
+    const filtered = kw
+      ? articles.filter(a => JSON.stringify(a).includes(kw))
+      : articles;
+
+    // 결과 없으면 앞 20개라도 반환
+    const source = filtered.length > 0 ? filtered : articles.slice(0, 20);
+
+    const result = source.slice(0, 50).map(a => ({
+      num:     a.조문번호  || '',
+      title:   a.조문제목  || '',
+      content: a.조문내용  || '',
+      items:   extractItems(a),
+    }));
+
+    res.status(200).json({ articles: result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+}
+
+function extractItems(a) {
+  const parts = [];
+  for (const h of [].concat(a.항 || [])) {
+    if (h.항내용) parts.push(h.항내용);
+    for (const ho of [].concat(h.호 || [])) {
+      if (ho.호내용) parts.push('  · ' + ho.호내용);
+    }
+  }
+  return parts;
 }

@@ -9,10 +9,10 @@ export default async function handler(req, res) {
     const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=law&type=JSON&display=20&query=${encodeURIComponent(query)}`;
     const upstream = await fetch(url);
     const text = await upstream.text();
-
-    // 응답 원문 그대로 반환
-    res.status(200).json({ __raw: text.slice(0, 2000) });
-
+    if (!text || text.trim().startsWith('<')) {
+      return res.status(200).json({ LawSearch: { law: [] } });
+    }
+    res.status(200).json(JSON.parse(text));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

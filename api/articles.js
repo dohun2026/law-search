@@ -1,45 +1,34 @@
-javascript// api/articles.js
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { mst, keyword } = req.query;
-  if (!mst) return res.status(400).json({ error: 'mst 파라미터 필요' });
-
   const OC = process.env.LAW_API_KEY;
-  if (!OC) return res.status(500).json({ error: 'API 키 미설정' });
 
   try {
-    const url = `https://open.law.go.kr/LSO/openApi/lawService.do` +
-      `?target=law&type=JSON&MST=${mst}&OC=${OC}`;
-
+    const url = `https://www.law.go.kr/DRF/lawService.do?OC=${OC}&target=law&type=JSON&MST=${mst}`;
+    
     const upstream = await fetch(url);
     const text = await upstream.text();
 
-    let data;
-    try { data = JSON.parse(text); }
-    catch { return res.status(502).json({ error: '파싱 실패', raw: text.slice(0, 300) }); }
+    if (!text || text.trim().startsWith('<')) {
+      return res.status(200).json({ articles: [], debug: text.slice(0, 300) });
+    }
 
-    const rawArticles =
-      data?.LawService?.법령?.조문?.조문단위 ||
-      data?.법령?.조문?.조문단위 || [];
-
+    const data = JSON.parse(text);
+    const rawArticles = data?.법령?.조문?.조문단위 || [];
     const articles = [].concat(rawArticles);
-
     const kw = keyword || '';
-    const filtered = kw
-      ? articles.filter(a => JSON.stringify(a).includes(kw))
-      : articles;
+    const filtered = kw ? articles.filter(a => JSON.stringify(a).includes(kw)) : articles;
 
     const result = filtered.slice(0, 30).map(a => ({
-      num:     a.조문번호  || '',
-      title:   a.조문제목  || '',
-      content: a.조문내용  || '',
-      items:   extractItems(a),
+      num: a.조문번호 || '',
+      title: a.조문제목 || '',
+      content: a.조문내용 || '',
+      items: extractItems(a),
     }));
 
-    res.status(200).json({ articles: result, total: filtered.length });
+    res.status(200).json({ articles: result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

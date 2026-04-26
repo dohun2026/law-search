@@ -1,123 +1,5 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>건축법령 검색</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
-    --border: #30363d; --accent: #e6a817; --accent2: #f0c040;
-    --text: #e6edf3; --text-muted: #8b949e; --text-dim: #484f58;
-    --success: #3fb950; --tag-bg: #1f2d3d; --tag-border: #264669;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:'Noto Sans KR',sans-serif; min-height:100vh; }
-  header { background:var(--surface); border-bottom:1px solid var(--border); padding:18px 24px; display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:100; }
-  .logo-icon { width:36px; height:36px; background:var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
-  .logo-text { font-family:'Noto Serif KR',serif; font-size:17px; font-weight:700; }
-  .logo-sub { font-size:11px; color:var(--text-muted); font-weight:300; margin-top:1px; }
-  .header-badge { margin-left:auto; font-size:11px; color:var(--success); background:rgba(63,185,80,0.12); border:1px solid rgba(63,185,80,0.3); padding:3px 10px; border-radius:20px; }
-  main { max-width:900px; margin:0 auto; padding:32px 20px; }
-  .search-label { font-size:12px; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; font-weight:500; }
-  .search-box { display:flex; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:6px 6px 6px 18px; transition:border-color 0.2s; }
-  .search-box:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px rgba(230,168,23,0.15); }
-  .search-box input { flex:1; background:none; border:none; outline:none; font-size:16px; font-family:'Noto Sans KR',sans-serif; color:var(--text); padding:8px 0; }
-  .search-box input::placeholder { color:var(--text-dim); }
-  .search-btn { background:var(--accent); color:#000; border:none; border-radius:8px; padding:10px 22px; font-size:14px; font-weight:700; font-family:'Noto Sans KR',sans-serif; cursor:pointer; transition:background 0.15s; }
-  .search-btn:hover { background:var(--accent2); }
-  .search-btn:disabled { background:var(--border); color:var(--text-dim); cursor:not-allowed; }
-  .quick-tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; margin-bottom:28px; }
-  .tag { font-size:12px; background:var(--tag-bg); border:1px solid var(--tag-border); color:#7ab8e8; padding:4px 12px; border-radius:20px; cursor:pointer; transition:all 0.15s; }
-  .tag:hover { background:var(--accent); border-color:var(--accent); color:#000; font-weight:700; }
-  .result-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-  .result-count { font-size:13px; color:var(--text-muted); }
-  .result-keyword { font-weight:700; color:var(--accent2); }
-  .law-list { display:flex; flex-direction:column; gap:6px; }
-  .law-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 18px; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:12px; }
-  .law-card:hover { border-color:var(--accent); background:var(--surface2); transform:translateX(3px); }
-  .law-card.active { border-color:var(--accent); background:rgba(230,168,23,0.06); }
-  .law-type-badge { font-size:10px; font-weight:700; padding:3px 8px; border-radius:5px; white-space:nowrap; flex-shrink:0; }
-  .badge-law     { background:rgba(63,185,80,0.15);  color:#3fb950; border:1px solid rgba(63,185,80,0.3); }
-  .badge-decree  { background:rgba(88,166,255,0.15); color:#58a6ff; border:1px solid rgba(88,166,255,0.3); }
-  .badge-rule    { background:rgba(188,140,255,0.15);color:#bc8cff; border:1px solid rgba(188,140,255,0.3); }
-  .badge-notice  { background:rgba(230,168,23,0.15); color:var(--accent); border:1px solid rgba(230,168,23,0.3); }
-  .law-name { flex:1; font-size:14px; font-weight:500; line-height:1.5; }
-  .law-name em { color:var(--accent2); font-style:normal; font-weight:700; background:rgba(230,168,23,0.1); padding:0 2px; border-radius:2px; }
-  .law-date { font-size:11px; color:var(--text-dim); white-space:nowrap; }
-  .law-arrow { color:var(--text-dim); font-size:16px; transition:transform 0.15s; }
-  .law-card:hover .law-arrow, .law-card.active .law-arrow { transform:translateX(3px); color:var(--accent); }
-  .article-panel { background:var(--surface2); border:1px solid var(--accent); border-top:none; border-radius:0 0 10px 10px; padding:0; display:none; overflow:hidden; }
-  .article-panel.open { display:block; animation:slideDown 0.2s ease; }
-  @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-  .panel-inner { padding:20px 22px; }
-  .panel-title { font-family:'Noto Serif KR',serif; font-size:15px; font-weight:700; color:var(--accent2); margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--border); }
-  .article-item { padding:13px 0; border-bottom:1px solid var(--border); }
-  .article-item:last-child { border-bottom:none; padding-bottom:0; }
-  .article-num { font-weight:700; color:var(--accent); font-family:'Noto Serif KR',serif; font-size:13px; margin-bottom:5px; }
-  .article-body { color:#cdd9e5; font-size:13px; line-height:1.9; }
-  .article-body em { color:var(--accent2); font-style:normal; background:rgba(230,168,23,0.12); padding:0 2px; border-radius:2px; font-weight:600; }
-  .article-sub { color:var(--text-muted); font-size:12.5px; line-height:1.8; margin-top:4px; padding-left:12px; border-left:2px solid var(--border); }
-  .panel-link { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); font-size:12px; color:var(--text-muted); }
-  .panel-link a { color:#58a6ff; text-decoration:none; }
-  .panel-link a:hover { text-decoration:underline; }
-  .loading { text-align:center; padding:40px 0; color:var(--text-muted); }
-  .spinner { display:inline-block; width:26px; height:26px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; margin-bottom:10px; }
-  @keyframes spin { to{transform:rotate(360deg)} }
-  .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
-  .empty-state .icon { font-size:44px; margin-bottom:14px; opacity:0.4; }
-  .empty-state p { font-size:14px; line-height:1.9; }
-  .error-msg { background:rgba(248,81,73,0.08); border:1px solid rgba(248,81,73,0.3); border-radius:10px; padding:16px 20px; color:#f85149; font-size:13px; line-height:1.7; }
-  .no-article { color:var(--text-muted); font-size:13px; padding:10px 0; }
-</style>
-</head>
-<body>
-<header>
-  <div class="logo-icon">⚖</div>
-  <div>
-    <div class="logo-text">건축법령 검색</div>
-    <div class="logo-sub">건축법 · 건설기술진흥법 · 시설물안전법 · 산업안전보건법</div>
-  </div>
-  <div class="header-badge">● 실시간 법령</div>
-</header>
-<main>
-  <div class="search-label">키워드 검색</div>
-  <div class="search-box">
-    <input type="text" id="searchInput" placeholder="예: 계단실, 피난계단, 방화구획, 내진, 안전점검…" onkeydown="if(event.key==='Enter') doSearch()">
-    <button class="search-btn" id="searchBtn" onclick="doSearch()">검색</button>
-  </div>
-  <div class="quick-tags">
-    <span class="tag" onclick="quickSearch('계단실')">계단실</span>
-    <span class="tag" onclick="quickSearch('피난계단')">피난계단</span>
-    <span class="tag" onclick="quickSearch('방화구획')">방화구획</span>
-    <span class="tag" onclick="quickSearch('내력벽')">내력벽</span>
-    <span class="tag" onclick="quickSearch('안전점검')">안전점검</span>
-    <span class="tag" onclick="quickSearch('정밀안전진단')">정밀안전진단</span>
-    <span class="tag" onclick="quickSearch('내진')">내진</span>
-    <span class="tag" onclick="quickSearch('비상구')">비상구</span>
-    <span class="tag" onclick="quickSearch('방수')">방수</span>
-    <span class="tag" onclick="quickSearch('균열')">균열</span>
-    <span class="tag" onclick="quickSearch('옹벽')">옹벽</span>
-    <span class="tag" onclick="quickSearch('가설구조물')">가설구조물</span>
-  </div>
-  <div id="resultArea">
-    <div class="empty-state">
-      <div class="icon">🏛</div>
-      <p>건축법, 건설기술진흥법, 시설물안전법 등<br>전체 법령을 키워드로 검색하세요.</p>
-    </div>
-  </div>
-</main>
-<script>
 const BASE = '';
-let currentKeyword = '';
-let openCardIdx = null;
-let lawData = [];
-
-function quickSearch(kw) {
-  document.getElementById('searchInput').value = kw;
-  doSearch();
-}
+const OC = 'dohun2026'; // 법제처 API 키 직접 입력
 
 async function doSearch() {
   const kw = document.getElementById('searchInput').value.trim();
@@ -128,10 +10,8 @@ async function doSearch() {
   btn.disabled = true; btn.textContent = '검색 중…';
   showLoading();
   try {
-    const res = await fetch(`${BASE}/api/search?query=${encodeURIComponent(kw)}`);
-    if (!res.ok) throw new Error(`서버 오류 ${res.status}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    // 법제처 직접 호출 (JSONP 방식)
+    const data = await fetchLawDirect(kw);
     const laws = [].concat(data?.LawSearch?.law || []);
     lawData = laws.map(l => ({
       id: l.법령ID||'', name: l.법령명한글||l.법령명||'(법령명 없음)',
@@ -145,88 +25,17 @@ async function doSearch() {
   }
 }
 
-async function togglePanel(idx) {
-  const panel = document.getElementById(`panel-${idx}`);
-  const card  = document.getElementById(`card-${idx}`);
-  if (panel.classList.contains('open')) {
-    panel.classList.remove('open'); card.classList.remove('active'); openCardIdx = null; return;
-  }
-  if (openCardIdx !== null) {
-    document.getElementById(`panel-${openCardIdx}`)?.classList.remove('open');
-    document.getElementById(`card-${openCardIdx}`)?.classList.remove('active');
-  }
-  panel.classList.add('open'); card.classList.add('active'); openCardIdx = idx;
-  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
-  const articlesDiv = document.getElementById(`articles-${idx}`);
-  if (!articlesDiv.dataset.loaded) { articlesDiv.dataset.loaded = '1'; await loadArticles(idx); }
-}
-
-async function loadArticles(idx) {
-  const law = lawData[idx];
-  const articlesDiv = document.getElementById(`articles-${idx}`);
-  try {
-    const res = await fetch(`${BASE}/api/articles?mst=${law.msn}&keyword=${encodeURIComponent(currentKeyword)}`);
-    if (!res.ok) throw new Error(`서버 오류 ${res.status}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    renderArticles(articlesDiv, data.articles||[], currentKeyword);
-  } catch(e) {
-    articlesDiv.innerHTML = `<div class="no-article">조문 로드 실패: ${e.message}</div>`;
-  }
-}
-
-function renderResults(results, kw) {
-  const area = document.getElementById('resultArea');
-  if (!results.length) { area.innerHTML = `<div class="error-msg">「${kw}」 관련 법령이 없습니다.</div>`; return; }
-  let html = `<div class="result-header"><div class="result-count"><span class="result-keyword">「${kw}」</span> 관련 법령 <strong style="color:var(--text)">${results.length}건</strong></div></div><div class="law-list">`;
-  results.forEach((law, i) => {
-    const typeLabel = {law:'법률',decree:'시행령',rule:'시행규칙',notice:'고시·예규'}[law.type]||'법령';
-    const highlighted = esc(law.name).replace(new RegExp(escRe(kw),'g'),`<em>${kw}</em>`);
-    html += `<div>
-      <div class="law-card" id="card-${i}" onclick="togglePanel(${i})">
-        <span class="law-type-badge badge-${law.type}">${typeLabel}</span>
-        <span class="law-name">${highlighted}</span>
-        <span class="law-date">${fmtDate(law.date)}</span>
-        <span class="law-arrow">›</span>
-      </div>
-      <div class="article-panel" id="panel-${i}">
-        <div class="panel-inner">
-          <div class="panel-title">📄 ${esc(law.name)} — 관련 조문</div>
-          <div id="articles-${i}"><div class="loading"><div class="spinner"></div><br><span style="font-size:13px">조문 불러오는 중…</span></div></div>
-          <div class="panel-link">🔗 <a href="https://www.law.go.kr/법령/${encodeURIComponent(law.name)}" target="_blank">법제처 국가법령정보센터에서 전문 보기 ↗</a></div>
-        </div>
-      </div>
-    </div>`;
+function fetchLawDirect(query) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'lawCb_' + Date.now();
+    const script = document.createElement('script');
+    script.src = `https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=law&type=JSON&display=20&query=${encodeURIComponent(query)}&callback=${cbName}`;
+    window[cbName] = (data) => {
+      delete window[cbName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+    script.onerror = () => reject(new Error('법제처 연결 실패'));
+    document.body.appendChild(script);
   });
-  html += '</div>';
-  area.innerHTML = html;
 }
-
-function renderArticles(container, articles, kw) {
-  if (!articles.length) { container.innerHTML = `<div class="no-article">「${kw}」가 포함된 조문을 찾지 못했습니다.</div>`; return; }
-  const re = new RegExp(escRe(kw),'g');
-  const mark = t => esc(t).replace(re,`<em>${kw}</em>`);
-  container.innerHTML = articles.map(a => {
-    const subHtml = (a.items||[]).map(s=>`<div>${mark(s)}</div>`).join('');
-    return `<div class="article-item">
-      <div class="article-num">제${a.num}조${a.title?' ('+esc(a.title)+')':''}</div>
-      ${a.content?`<div class="article-body">${mark(a.content)}</div>`:''}
-      ${subHtml?`<div class="article-sub">${subHtml}</div>`:''}
-    </div>`;
-  }).join('');
-}
-
-function classifyType(t) {
-  if(t.includes('법률')) return 'law';
-  if(t.includes('대통령령')||t.includes('시행령')) return 'decree';
-  if(t.includes('시행규칙')||t.includes('부령')) return 'rule';
-  return 'notice';
-}
-function fmtDate(d) { if(!d||d.length<8) return ''; return `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`; }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
-function showLoading() { document.getElementById('resultArea').innerHTML=`<div class="loading"><div class="spinner"></div><br><span style="font-size:13px">검색 중…</span></div>`; }
-function showError(msg) { document.getElementById('resultArea').innerHTML=`<div class="error-msg">${msg}</div>`; }
-</script>
-</body>
-</html>

@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   const OC = process.env.LAW_API_KEY;
 
   try {
-    const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=law&type=JSON&display=20&query=${encodeURIComponent(query)}`;
+    // search=1 : 법령명+본문 통합검색
+    const url = `https://www.law.go.kr/DRF/lawSearch.do?OC=${OC}&target=law&type=JSON&display=20&search=1&query=${encodeURIComponent(query)}`;
     const upstream = await fetch(url);
     const text = await upstream.text();
     if (!text || text.trim().startsWith('<')) {

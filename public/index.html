@@ -13,7 +13,10 @@
   .logo-icon{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
   .logo-text{font-family:'Noto Serif KR',serif;font-size:17px;font-weight:700;}
   .logo-sub{font-size:11px;color:var(--text-muted);font-weight:300;margin-top:1px;}
-  .header-badge{margin-left:auto;font-size:11px;color:var(--success);background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);padding:3px 10px;border-radius:20px;}
+  .header-badge{font-size:11px;color:var(--success);background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);padding:3px 10px;border-radius:20px;}
+  .company-logos{margin-left:auto;display:flex;align-items:center;gap:18px;}
+  .company-logos img{height:32px;width:auto;border-radius:4px;background:#fff;padding:2px 6px;}
+  @media (max-width:640px){.company-logos{display:none;}}
   main{max-width:900px;margin:0 auto;padding:32px 20px;}
   .search-label{font-size:12px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:500;}
   .search-box{display:flex;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px 6px 6px 18px;transition:border-color 0.2s;}
@@ -81,6 +84,10 @@
   <div>
     <div class="logo-text">건축법령 검색</div>
     <div class="logo-sub">건축법 · 건설기술진흥법 · 시설물안전법 · 산업안전보건법</div>
+  </div>
+  <div class="company-logos">
+    <img src="/yuwon-logo.jpg" alt="(주)유원구조진단건축사사무소">
+    <img src="/jangwon-logo.jpg" alt="(주)장원구조건축사사무소">
   </div>
   <div class="header-badge">● 실시간 법령</div>
 </header>
